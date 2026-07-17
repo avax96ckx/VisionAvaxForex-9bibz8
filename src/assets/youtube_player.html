@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>YouTube Player</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+    #player-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #000;
+    }
+    #player {
+      width: 100%;
+      height: 100%;
+    }
+    /* Sits above the iframe and swallows all pointer events so YouTube's
+       hover UI (logo, Watch-on-YouTube link, related-videos panel) never
+       appears. Play/pause/seek still work via JS calls from Flutter. */
+    #pointer-blocker {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      background: transparent;
+      pointer-events: all;
+    }
+  </style>
+</head>
+<body>
+  <div id="player-container">
+    <div id="player"></div>
+    <div id="pointer-blocker"></div>
+  </div>
+
+  <script>
+    var player;
+    var progressInterval = null;
+    // Two-source videoId: macOS substitutes the placeholder before loadHtmlString;
+    // Windows serves this file via InAppLocalhostServer and passes ?v=VIDEO_ID.
+    var videoId = (new URLSearchParams(window.location.search)).get('v')
+                  || 'VIDEO_ID_PLACEHOLDER';
+
+    // Load the IFrame Player API asynchronously
+    var tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    // Called automatically by the IFrame API when ready
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        // youtube-nocookie has a lighter anti-bot profile than youtube.com.
+        // Same API, same events, no cookies — fixes "sign in to confirm
+        // you're not a bot" challenges that fire when the parent origin is
+        // http://localhost (Windows path).
+        host: 'https://www.youtube-nocookie.com',
+        videoId: videoId,
+        width: '100%',
+        height: '100%',
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          modestbranding: 1,
+          rel: 0,
+          showinfo: 0,
+          fs: 0,
+          iv_load_policy: 3,
+          disablekb: 0,
+          playsinline: 1,
+          vq: 'hd1080'
+        },
+        events: {
+          onReady: onPlayerReady,
+          onStateChange: onPlayerStateChange,
+          onError: onPlayerError
+        }
+      });
+    }
+
+    // Pick the highest quality level the video actually has available.
+    // getAvailableQualityLevels() returns levels ordered highest → lowest,
+    // e.g. ['hd1080', 'hd720', 'large', 'medium', 'small', 'tiny'].
+    function forceHighestQuality() {
+      if (!player || typeof player.getAvailableQualityLevels !== 'function') return;
+      var levels = player.getAvailableQualityLevels();
+      if (levels && levels.length > 0) {
+        player.setPlaybackQuality(levels[0]);
+      }
+    }
+
+    function onPlayerReady(event) {
+      forceHighestQuality();
+      event.target.playVideo();
+      sendMessage({ event: 'ready' });
+    }
+
+    function onPlayerStateChange(event) {
+      // Re-apply on every buffering start: covers the initial load, every
+      // loadVideoById switch, and any quality downgrade YouTube tries to apply.
+      if (event.data === YT.PlayerState.BUFFERING) {
+        forceHighestQuality();
+      }
+      sendMessage({ event: 'stateChange', state: event.data });
+
+      if (event.data === YT.PlayerState.PLAYING) {
+        startProgressUpdates();
+      } else {
+        stopProgressUpdates();
+      }
+    }
+
+    function onPlayerError(event) {
+      sendMessage({ event: 'error', code: event.data });
+    }
+
+    function startProgressUpdates() {
+      stopProgressUpdates();
+      progressInterval = setInterval(function () {
+        if (player && typeof player.getCurrentTime === 'function') {
+          sendMessage({
+            event: 'progress',
+            currentTime: player.getCurrentTime(),
+            duration: player.getDuration(),
+            buffered: player.getVideoLoadedFraction()
+          });
+        }
+      }, 500);
+    }
+
+    function stopProgressUpdates() {
+      if (progressInterval !== null) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
+    }
+
+    // Send message back to Flutter
+    function sendMessage(data) {
+      var json = JSON.stringify(data);
+      // webview_flutter JS channel (macOS / iOS / Android via addJavaScriptChannel)
+      if (typeof YTPlayer !== 'undefined' && YTPlayer.postMessage) {
+        YTPlayer.postMessage(json);
+        return;
+      }
+      // flutter_inappwebview handler
+      if (window.flutter_inappwebview) {
+        window.flutter_inappwebview.callHandler('onPlayerEvent', json);
+        return;
+      }
+      // postMessage fallback
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(json, '*');
+      } else {
+        window.postMessage(json, '*');
+      }
+    }
+
+    // Exposed functions callable from Flutter via evaluateJavascript
+    function playVideo() {
+      if (player) player.playVideo();
+    }
+
+    function pauseVideo() {
+      if (player) player.pauseVideo();
+    }
+
+    function seekTo(seconds) {
+      if (player) player.seekTo(seconds, true);
+    }
+
+    function setVolume(volume) {
+      if (player) player.setVolume(volume);
+    }
+
+    function mute() {
+      if (player) player.mute();
+    }
+
+    function unMute() {
+      if (player) player.unMute();
+    }
+
+    function getCurrentTime() {
+      return player ? player.getCurrentTime() : 0.0;
+    }
+
+    function getDuration() {
+      return player ? player.getDuration() : 0.0;
+    }
+
+    function getPlayerState() {
+      return player ? player.getPlayerState() : -1;
+    }
+
+    function getVideoLoadedFraction() {
+      return player ? player.getVideoLoadedFraction() : 0.0;
+    }
+
+    function setPlaybackRate(rate) {
+      if (player) player.setPlaybackRate(rate);
+    }
+
+    function loadVideoById(videoId) {
+      if (player) {
+        // Object form lets us pass suggestedQuality alongside the videoId.
+        player.loadVideoById({ videoId: videoId, suggestedQuality: 'hd1080' });
+      }
+    }
+
+    // Listen for incoming command messages from Flutter
+    window.addEventListener('message', function (event) {
+      var data;
+      try {
+        data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+      } catch (e) {
+        return;
+      }
+      if (!data || !data.action) return;
+
+      switch (data.action) {
+        case 'play':
+          playVideo();
+          break;
+        case 'pause':
+          pauseVideo();
+          break;
+        case 'seek':
+          seekTo(data.value);
+          break;
+        case 'setVolume':
+          setVolume(data.value);
+          break;
+        case 'mute':
+          mute();
+          break;
+        case 'unMute':
+          unMute();
+          break;
+        case 'setPlaybackRate':
+          setPlaybackRate(data.value);
+          break;
+        case 'loadVideo':
+          loadVideoById(data.videoId);
+          break;
+      }
+    });
+  </script>
+</body>
+</html>
