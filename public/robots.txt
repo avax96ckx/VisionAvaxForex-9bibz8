@@ -16,4 +16,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://react-9bibz8.onspace.build/sitemap.xml
+Sitemap: https://vision-avax-forex-9bibz8.vercel.app/
