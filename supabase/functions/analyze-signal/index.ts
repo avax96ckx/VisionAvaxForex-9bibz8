@@ -110,13 +110,16 @@ RULES:
         if (orRes.ok) {
           const orData = await orRes.json();
           rawText = orData.choices?.[0]?.message?.content ?? '';
+        } else {
+          const errTxt = await orRes.text().catch(() => '');
+          console.warn('OpenRouter failed:', orRes.status, errTxt.slice(0, 150));
         }
       } catch (orErr) {
         console.error(String(orErr));
       }
     }
 
-    let parsed = {};
+    let parsed: Record<string, string> = {};
     if (rawText) {
       try {
         const cleanedText = rawText.trim();
@@ -149,7 +152,7 @@ RULES:
           }
         }
       } catch (e) {
-        console.error(e);
+        console.error('JSON parse error:', e);
         parsed = {};
       }
     }
@@ -159,7 +162,7 @@ RULES:
     });
 
   } catch (err) {
-    console.error(err);
+    console.error('Function error:', err);
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
