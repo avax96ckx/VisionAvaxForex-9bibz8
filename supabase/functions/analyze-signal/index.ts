@@ -109,24 +109,21 @@ RULES:
             max_tokens: 300,
           }),
         });
-        if (orRes.ok) {
-  const orData = await orRes.json();
-
-  console.log("========== OPENROUTER ==========");
-  console.log(JSON.stringify(orData, null, 2));
-
-  const content = orData.choices?.[0]?.message?.content;
-
-  if (typeof content === "string") {
-    rawText = content;
-  } else if (Array.isArray(content)) {
-    rawText = content
-      .map((item: any) => item.text ?? "")
-      .join("");
-  } else {
-    rawText = "";
+        return new Response(
+  JSON.stringify({
+    success: true,
+    provider: usedProvider,
+    openrouter: orData,
+    raw: rawText,
+    parsed: parsed
+  }),
+  {
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json"
+    }
   }
-
+);
   console.log("RAW TEXT:", rawText);
 
   usedProvider = "openrouter";
