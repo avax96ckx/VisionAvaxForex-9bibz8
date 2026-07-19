@@ -122,18 +122,6 @@ RULES:
         console.warn('OpenRouter error, falling back to openRouter:', String(orErr));
       }
     }
-      if (!aiRes.ok) {
-        const errText = await aiRes.text().catch(() => 'Unknown');
-        console.error('openRouter error:', aiRes.status, errText);
-        return new Response(JSON.stringify({ error: `openRouter: ${aiRes.status} — ${errText.slice(0, 200)}` }), {
-          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      const aiData = await aiRes.json();
-      rawText = aiData.choices?.[0]?.message?.content ?? '';
-      usedProvider = 'openRouter';
-      console.log('analyze-signal: used OpenRouter Gemini 2.5 Flash');
-    }
 
     // Parse JSON from response
     let parsed: Record<string, string> = {};
