@@ -20,9 +20,7 @@ Deno.serve(async (req) => {
       .select('api_keys')
       .eq('id', 'main')
       .single();
-    const dbGroqKey = (settingsData?.api_keys?.groq) ?? '';
     const dbOpenRouterKey = (settingsData?.api_keys?.openrouter) ?? '';
-    const groqKey = dbGroqKey || (Deno.env.get('GROQ_API_KEY') ?? '');
     const openRouterKey = dbOpenRouterKey || (Deno.env.get('OPENROUTER_API_KEY') ?? '');
 
     const { imageUrl, mode } = await req.json();
