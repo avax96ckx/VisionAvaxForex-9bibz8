@@ -124,12 +124,12 @@ RULES:
     }
 
     // Parse JSON from response
-    let parsed = {};
-    if (rawText) {
-      try {
-        const cleanedText = rawText.trim();
-        const firstBracket = cleanedText.indexOf('{');
-        const lastBracket = cleanedText.lastIndexOf('}');
+       let parsed = {};
+        if (rawText) {
+         try {
+          const cleanedText = rawText.trim();
+          const firstBracket = cleanedText.indexOf('{');
+          const lastBracket = cleanedText.lastIndexOf('}');
         
         if (firstBracket !== -1 && lastBracket !== -1) {
           const jsonString = cleanedText.substring(firstBracket, lastBracket + 1);
