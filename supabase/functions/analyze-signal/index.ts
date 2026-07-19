@@ -124,27 +124,6 @@ RULES:
     }
 
     // ── Fallback to OpenRouter (Llama 4 Scout — vision capable) ──
-    if (!rawText) {
-      if (!openRouterKey) {
-        return new Response(JSON.stringify({ error: 'No API key configured. Add openRouter or OpenRouter key in Admin → API Keys.' }), {
-          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      const aiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openRouterKey}`,
-          'HTTP-Referer': 'https://visionavaxforex.onspace.app',
-          'X-Title': 'VISION AVAX FOREX',
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [{ role: 'system', content: systemPrompt }, userMsg],
-          temperature: 0.05,
-          max_tokens: 256,
-        }),
-      });
       if (!aiRes.ok) {
         const errText = await aiRes.text().catch(() => 'Unknown');
         console.error('openRouter error:', aiRes.status, errText);
