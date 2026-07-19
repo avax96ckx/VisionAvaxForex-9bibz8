@@ -61,7 +61,7 @@ serve(async (req) => {
             'X-Title': 'VISION AVAX FOREX',
           },
           body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
+            model: 'google/gemini-2.5-flash'
             messages: [
               {
                 role: 'system',
