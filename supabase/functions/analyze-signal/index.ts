@@ -20,9 +20,7 @@ Deno.serve(async (req) => {
       .select('api_keys')
       .eq('id', 'main')
       .single();
-    const dbGroqKey = (settingsData?.api_keys?.groq) ?? '';
     const dbOpenRouterKey = (settingsData?.api_keys?.openrouter) ?? '';
-    const groqKey = dbGroqKey || (Deno.env.get('GROQ_API_KEY') ?? '');
     const openRouterKey = dbOpenRouterKey || (Deno.env.get('OPENROUTER_API_KEY') ?? '');
 
     const { imageUrl, mode } = await req.json();
@@ -91,7 +89,7 @@ RULES:
     };
 
     let rawText = '';
-    let usedProvider = 'groq';
+    let usedProvider = 'openRouter';
 
     // ── Try OpenRouter first (Gemini 2.5 Flash — best vision accuracy) ──
     if (openRouterKey) {
@@ -118,30 +116,30 @@ RULES:
           console.log('analyze-signal: used OpenRouter Gemini 2.5 Flash');
         } else {
           const errTxt = await orRes.text().catch(() => '');
-          console.warn('OpenRouter failed, falling back to Groq:', orRes.status, errTxt.slice(0, 150));
+          console.warn('OpenRouter failed, falling back to openRouter:', orRes.status, errTxt.slice(0, 150));
         }
       } catch (orErr) {
-        console.warn('OpenRouter error, falling back to Groq:', String(orErr));
+        console.warn('OpenRouter error, falling back to openRouter:', String(orErr));
       }
     }
 
-    // ── Fallback to Groq (Llama 4 Scout — vision capable) ──
+    // ── Fallback to OpenRouter (Llama 4 Scout — vision capable) ──
     if (!rawText) {
-      if (!groqKey) {
-        return new Response(JSON.stringify({ error: 'No API key configured. Add Groq or OpenRouter key in Admin → API Keys.' }), {
+      if (!openRouterKey) {
+        return new Response(JSON.stringify({ error: 'No API key configured. Add openRouter or OpenRouter key in Admin → API Keys.' }), {
           status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      const aiRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const aiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${groqKey}`,
+          'Authorization': `Bearer ${openRouterKey}`,
           'HTTP-Referer': 'https://visionavaxforex.onspace.app',
           'X-Title': 'VISION AVAX FOREX',
         },
         body: JSON.stringify({
-          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+          model: 'google/gemini-2.5-flash',
           messages: [{ role: 'system', content: systemPrompt }, userMsg],
           temperature: 0.05,
           max_tokens: 256,
@@ -149,15 +147,15 @@ RULES:
       });
       if (!aiRes.ok) {
         const errText = await aiRes.text().catch(() => 'Unknown');
-        console.error('Groq error:', aiRes.status, errText);
-        return new Response(JSON.stringify({ error: `Groq: ${aiRes.status} — ${errText.slice(0, 200)}` }), {
+        console.error('openRouter error:', aiRes.status, errText);
+        return new Response(JSON.stringify({ error: `openRouter: ${aiRes.status} — ${errText.slice(0, 200)}` }), {
           status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
       const aiData = await aiRes.json();
       rawText = aiData.choices?.[0]?.message?.content ?? '';
-      usedProvider = 'groq';
-      console.log('analyze-signal: used Groq Llama 4 Scout');
+      usedProvider = 'openRouter';
+      console.log('analyze-signal: used OpenRouter Gemini 2.5 Flash');
     }
 
     // Parse JSON from response
