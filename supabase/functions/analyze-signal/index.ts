@@ -109,25 +109,19 @@ RULES:
             max_tokens: 300,
           }),
         });
-        return new Response(
-  JSON.stringify({
-    success: true,
-    provider: usedProvider,
-    openrouter: orData,
-    raw: rawText,
-    parsed: parsed
-  }),
-  {
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "application/json"
-    }
-  }
-);
-  console.log("RAW TEXT:", rawText);
-
-  usedProvider = "openrouter";
-        }
+        if (!aiRes.ok) {
+        const errText = await aiRes.text().catch(() => 'Unknown');
+        console.error('Groq error:', aiRes.status, errText);
+        return new Response(JSON.stringify({ error: `Groq: ${aiRes.status} — ${errText.slice(0, 200)}` }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const aiData = await aiRes.json();
+      rawText = aiData.choices?.[0]?.message?.content ?? '';
+      usedProvider = 'groq';
+      console.log('analyze-signal: used Groq Llama 4 Scout');
+      }
+      
     // Parse JSON from response
     let parsed: Record<string, string> = {};
     try {
