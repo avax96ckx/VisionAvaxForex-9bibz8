@@ -92,12 +92,12 @@ RULES:
 
     if (openRouterKey) {
       try {
-        const orRes = await fetch('https://openrouter.ai', {
+        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${openRouterKey}`,
-            'HTTP-Referer': 'https://onspace.app',
+            'HTTP-Referer': 'https://visionavaxforex.onspace.app',
             'X-Title': 'VISION AVAX FOREX',
           },
           body: JSON.stringify({
@@ -110,9 +110,13 @@ RULES:
         if (orRes.ok) {
           const orData = await orRes.json();
           rawText = orData.choices?.[0]?.message?.content ?? '';
+          console.log('analyze-signal: used OpenRouter Gemini 2.5 Flash');
+        } else {
+          const errTxt = await orRes.text().catch(() => '');
+          console.warn('OpenRouter failed:', orRes.status, errTxt.slice(0, 150));
         }
       } catch (orErr) {
-        console.error(String(orErr));
+        console.warn('OpenRouter error:', String(orErr));
       }
     }
 
@@ -149,7 +153,7 @@ RULES:
           }
         }
       } catch (e) {
-        console.error(e);
+        console.error('JSON parse error:', e);
         parsed = {};
       }
     }
@@ -159,7 +163,7 @@ RULES:
     });
 
   } catch (err) {
-    console.error(err);
+    console.error('analyze-signal error:', err);
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
