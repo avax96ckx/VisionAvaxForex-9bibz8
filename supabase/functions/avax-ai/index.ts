@@ -583,7 +583,7 @@ Deno.serve(async (req) => {
             'X-Title': 'VISION AVAX FOREX',
           },
           body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
+            model: 'google/gemini-2.5-flash'
             messages: [{ role: 'user', content: 'Reply with exactly: OK' }],
             max_tokens: 10,
           }),
@@ -672,7 +672,7 @@ Deno.serve(async (req) => {
             'X-Title': 'AVAX AI Trading Assistant',
           },
           body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
+            model: 'google/gemini-2.5-flash'
             messages: [
               { role: 'system', content: effectiveSystemPrompt },
               { role: 'user', content: 'Introduce yourself and this topic. Be comprehensive, detailed and helpful. End by asking if the user has questions.' },
