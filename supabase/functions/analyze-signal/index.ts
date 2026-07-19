@@ -112,6 +112,7 @@ RULES:
           rawText = orData.choices?.[0]?.message?.content ?? '';
         } else {
           const errTxt = await orRes.text().catch(() => '');
+          console.log(JSON.stringify(orData, null, 2));
           console.warn('OpenRouter failed:', orRes.status, errTxt.slice(0, 150));
         }
       } catch (orErr) {
