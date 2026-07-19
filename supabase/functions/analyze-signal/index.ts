@@ -111,15 +111,15 @@ RULES:
         });
         if (!aiRes.ok) {
         const errText = await aiRes.text().catch(() => 'Unknown');
-        console.error('Groq error:', aiRes.status, errText);
-        return new Response(JSON.stringify({ error: `Groq: ${aiRes.status} — ${errText.slice(0, 200)}` }), {
+        console.error('OpenRouter error:', aiRes.status, errText);
+        return new Response(JSON.stringify({ error: `OpenRouter: ${aiRes.status} — ${errText.slice(0, 200)}` }), {
           status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
       const aiData = await aiRes.json();
       rawText = aiData.choices?.[0]?.message?.content ?? '';
-      usedProvider = 'groq';
-      console.log('analyze-signal: used Groq Llama 4 Scout');
+      usedProvider = 'OpenRouter';
+      console.log('analyze-signal: used OpenRouter Gemini 2.5 Flash');
       }
       
     // Parse JSON from response
