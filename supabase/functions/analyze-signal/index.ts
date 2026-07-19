@@ -105,7 +105,7 @@ RULES:
             'X-Title': 'VISION AVAX FOREX',
           },
           body: JSON.stringify({
-            model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+            model: 'google/gemini-2.5-flash',
             messages: [{ role: 'system', content: systemPrompt }, userMsg],
             temperature: 0.05,
             max_tokens: 300,
