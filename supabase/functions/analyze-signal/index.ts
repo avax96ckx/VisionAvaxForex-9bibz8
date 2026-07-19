@@ -124,12 +124,17 @@ RULES:
     }
 
     // Parse JSON from response
-    let parsed: Record<string, string> = {};
-    try {
-      const jsonMatch = rawText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/) || rawText.match(/(\{[\s\S]*?\})/);
-      if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
-
+    let parsed = {};
+    if (rawText) {
+      try {
+        const cleanedText = rawText.trim();
+        const firstBracket = cleanedText.indexOf('{');
+        const lastBracket = cleanedText.lastIndexOf('}');
+        
+        if (firstBracket !== -1 && lastBracket !== -1) {
+          const jsonString = cleanedText.substring(firstBracket, lastBracket + 1);
+          parsed = JSON.parse(jsonString);
+          
         // Normalize direction
         if (parsed.direction) {
           const d = parsed.direction.toUpperCase().trim();
