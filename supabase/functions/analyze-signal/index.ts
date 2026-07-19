@@ -122,8 +122,6 @@ RULES:
         console.warn('OpenRouter error, falling back to openRouter:', String(orErr));
       }
     }
-
-    // ── Fallback to OpenRouter (Llama 4 Scout — vision capable) ──
       if (!aiRes.ok) {
         const errText = await aiRes.text().catch(() => 'Unknown');
         console.error('openRouter error:', aiRes.status, errText);
