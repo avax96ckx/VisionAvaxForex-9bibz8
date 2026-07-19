@@ -125,41 +125,6 @@ RULES:
       }
     }
 
-    // ── Fallback to Groq (Llama 4 Scout — vision capable) ──
-    if (!rawText) {
-      if (!groqKey) {
-        return new Response(JSON.stringify({ error: 'No API key configured. Add Groq or OpenRouter key in Admin → API Keys.' }), {
-          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      const aiRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${groqKey}`,
-          'HTTP-Referer': 'https://visionavaxforex.onspace.app',
-          'X-Title': 'VISION AVAX FOREX',
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [{ role: 'system', content: systemPrompt }, userMsg],
-          temperature: 0.05,
-          max_tokens: 256,
-        }),
-      });
-      if (!aiRes.ok) {
-        const errText = await aiRes.text().catch(() => 'Unknown');
-        console.error('Groq error:', aiRes.status, errText);
-        return new Response(JSON.stringify({ error: `Groq: ${aiRes.status} — ${errText.slice(0, 200)}` }), {
-          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      const aiData = await aiRes.json();
-      rawText = aiData.choices?.[0]?.message?.content ?? '';
-      usedProvider = 'groq';
-      console.log('analyze-signal: used Groq Llama 4 Scout');
-    }
-
     // Parse JSON from response
     let parsed: Record<string, string> = {};
     try {
