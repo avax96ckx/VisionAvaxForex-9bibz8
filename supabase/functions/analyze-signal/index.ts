@@ -110,19 +110,27 @@ RULES:
           }),
         });
         if (orRes.ok) {
-          const orData = await orRes.json();
-          rawText = orData.choices?.[0]?.message?.content ?? '';
-          usedProvider = 'openrouter';
-          console.log('analyze-signal: used OpenRouter Gemini 2.5 Flash');
-        } else {
-          const errTxt = await orRes.text().catch(() => '');
-          console.warn('OpenRouter failed, falling back to openRouter:', orRes.status, errTxt.slice(0, 150));
-        }
-      } catch (orErr) {
-        console.warn('OpenRouter error, falling back to openRouter:', String(orErr));
-      }
-    }
+  const orData = await orRes.json();
 
+  console.log("========== OPENROUTER ==========");
+  console.log(JSON.stringify(orData, null, 2));
+
+  const content = orData.choices?.[0]?.message?.content;
+
+  if (typeof content === "string") {
+    rawText = content;
+  } else if (Array.isArray(content)) {
+    rawText = content
+      .map((item: any) => item.text ?? "")
+      .join("");
+  } else {
+    rawText = "";
+  }
+
+  console.log("RAW TEXT:", rawText);
+
+  usedProvider = "openrouter";
+        }
     // Parse JSON from response
     let parsed: Record<string, string> = {};
     try {
