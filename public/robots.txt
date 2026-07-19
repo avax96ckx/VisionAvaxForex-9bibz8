@@ -1,4 +1,19 @@
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
 User-agent: *
 Allow: /
 
-Sitemap: https://vision-avax-forex-9bibz8.vercel.app/sitemap.xml
+User-agent: *
+Allow: /
+
+Sitemap: https://react-9bibz8.onspace.build/sitemap.xml
