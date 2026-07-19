@@ -10,6 +10,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
+    // Load API key: check DB first, fall back to env
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -19,8 +20,9 @@ Deno.serve(async (req) => {
       .select('api_keys')
       .eq('id', 'main')
       .single();
-    
+    const dbGroqKey = (settingsData?.api_keys?.groq) ?? '';
     const dbOpenRouterKey = (settingsData?.api_keys?.openrouter) ?? '';
+    const groqKey = dbGroqKey || (Deno.env.get('GROQ_API_KEY') ?? '');
     const openRouterKey = dbOpenRouterKey || (Deno.env.get('OPENROUTER_API_KEY') ?? '');
 
     const { imageUrl, mode } = await req.json();
@@ -31,6 +33,7 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ── SYSTEM PROMPTS ──────────────────────────────────────────────
     const systemPrompt = mode === 'result'
       ? `You are a professional forex trade result analyst. Analyze this trading result screenshot.
 
@@ -88,8 +91,9 @@ RULES:
     };
 
     let rawText = '';
-    let usedProvider = 'openrouter';
+    let usedProvider = 'groq';
 
+    // ── Try OpenRouter first (Gemini 2.5 Flash — best vision accuracy) ──
     if (openRouterKey) {
       try {
         const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -97,7 +101,7 @@ RULES:
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${openRouterKey}`,
-            'HTTP-Referer': 'https://onspace.app',
+            'HTTP-Referer': 'https://visionavaxforex.onspace.app',
             'X-Title': 'VISION AVAX FOREX',
           },
           body: JSON.stringify({
@@ -109,60 +113,87 @@ RULES:
         });
         if (orRes.ok) {
           const orData = await orRes.json();
-          const content = orData.choices?.[0]?.message?.content;
-          
-           if (typeof content === "string") {
-            rawText = content;
-            } else if (Array.isArray(content)) {
-            rawText = content
-            .map((x: any) => x.text ?? "")
-           .join("");
-          }
+          rawText = orData.choices?.[0]?.message?.content ?? '';
+          usedProvider = 'openrouter';
+          console.log('analyze-signal: used OpenRouter Gemini 2.5 Flash');
+        } else {
           const errTxt = await orRes.text().catch(() => '');
-          console.log(JSON.stringify(orData, null, 2));
-          console.warn('OpenRouter failed:', orRes.status, errTxt.slice(0, 150));
+          console.warn('OpenRouter failed, falling back to Groq:', orRes.status, errTxt.slice(0, 150));
         }
       } catch (orErr) {
-        console.error(String(orErr));
+        console.warn('OpenRouter error, falling back to Groq:', String(orErr));
       }
     }
 
+    // ── Fallback to Groq (Llama 4 Scout — vision capable) ──
+    if (!rawText) {
+      if (!groqKey) {
+        return new Response(JSON.stringify({ error: 'No API key configured. Add Groq or OpenRouter key in Admin → API Keys.' }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const aiRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${groqKey}`,
+          'HTTP-Referer': 'https://visionavaxforex.onspace.app',
+          'X-Title': 'VISION AVAX FOREX',
+        },
+        body: JSON.stringify({
+          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+          messages: [{ role: 'system', content: systemPrompt }, userMsg],
+          temperature: 0.05,
+          max_tokens: 256,
+        }),
+      });
+      if (!aiRes.ok) {
+        const errText = await aiRes.text().catch(() => 'Unknown');
+        console.error('Groq error:', aiRes.status, errText);
+        return new Response(JSON.stringify({ error: `Groq: ${aiRes.status} — ${errText.slice(0, 200)}` }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const aiData = await aiRes.json();
+      rawText = aiData.choices?.[0]?.message?.content ?? '';
+      usedProvider = 'groq';
+      console.log('analyze-signal: used Groq Llama 4 Scout');
+    }
+
+    // Parse JSON from response
     let parsed: Record<string, string> = {};
-    if (rawText) {
-      try {
-        const cleanedText = rawText.trim();
-        const firstBracket = cleanedText.indexOf('{');
-        const lastBracket = cleanedText.lastIndexOf('}');
-        
-        if (firstBracket !== -1 && lastBracket !== -1) {
-          const jsonString = cleanedText.substring(firstBracket, lastBracket + 1);
-          parsed = JSON.parse(jsonString);
+    try {
+      const jsonMatch = rawText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/) || rawText.match(/(\{[\s\S]*?\})/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
 
-          if (parsed.direction) {
-            const d = parsed.direction.toUpperCase().trim();
-            parsed.direction = (d === 'SELL' || d === 'SHORT' || d === 'S') ? 'SELL' : 'BUY';
-          }
+        // Normalize direction
+        if (parsed.direction) {
+          const d = parsed.direction.toUpperCase().trim();
+          parsed.direction = (d === 'SELL' || d === 'SHORT' || d === 'S') ? 'SELL' : 'BUY';
+        }
 
-          if (parsed.entry && parsed.stop_loss) {
-            const entry = parseFloat(parsed.entry);
-            const sl = parseFloat(parsed.stop_loss);
-            if (!isNaN(entry) && !isNaN(sl)) {
-              if (sl > entry && parsed.direction === 'BUY') parsed.direction = 'SELL';
-              else if (sl < entry && parsed.direction === 'SELL') parsed.direction = 'BUY';
-            }
-          }
-
-          if (parsed.pair) {
-            const p = parsed.pair.toUpperCase();
-            if (p.includes('XAU') || p.includes('GOLD')) parsed.type = 'gold';
-            else if (['BTC', 'ETH', 'USDT', 'DOGE', 'SOL', 'BNB', 'XRP'].some(c => p.includes(c))) parsed.type = 'crypto';
-            else if (!parsed.type) parsed.type = 'forex';
+        // Auto-correct direction based on SL vs entry logic
+        if (parsed.entry && parsed.stop_loss) {
+          const entry = parseFloat(parsed.entry);
+          const sl = parseFloat(parsed.stop_loss);
+          if (!isNaN(entry) && !isNaN(sl)) {
+            if (sl > entry && parsed.direction === 'BUY') parsed.direction = 'SELL';
+            else if (sl < entry && parsed.direction === 'SELL') parsed.direction = 'BUY';
           }
         }
-      } catch (e) {
-        console.error('JSON parse error:', e);
-        parsed = {};
+
+        // Auto-detect type from pair
+        if (parsed.pair) {
+          const p = parsed.pair.toUpperCase();
+          if (p.includes('XAU') || p.includes('GOLD')) parsed.type = 'gold';
+          else if (['BTC', 'ETH', 'USDT', 'DOGE', 'SOL', 'BNB', 'XRP'].some(c => p.includes(c))) parsed.type = 'crypto';
+          else if (!parsed.type) parsed.type = 'forex';
+        }
       }
+    } catch (e) {
+      console.error('JSON parse error:', e, 'raw text:', rawText.slice(0, 300));
+      parsed = {};
     }
 
     return new Response(JSON.stringify({ success: true, data: parsed, provider: usedProvider }), {
@@ -170,7 +201,7 @@ RULES:
     });
 
   } catch (err) {
-    console.error('Function error:', err);
+    console.error('analyze-signal error:', err);
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
