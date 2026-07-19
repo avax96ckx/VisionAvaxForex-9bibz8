@@ -583,9 +583,11 @@ Deno.serve(async (req) => {
             'X-Title': 'VISION AVAX FOREX',
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-flash'
-            messages: [{ role: 'user', content: 'Reply with exactly: OK' }],
-            max_tokens: 10,
+  model: 'google/gemini-2.5-flash',
+  messages: [{ role: 'system', content: systemPrompt }, userMsg],
+  temperature: 0.05,
+  max_tokens: 300,
+})
           }),
         });
         if (!testRes.ok) {
