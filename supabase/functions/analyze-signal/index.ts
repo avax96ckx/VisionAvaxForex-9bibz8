@@ -99,7 +99,7 @@ RULES:
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${openRouterKey}`,
-            'HTTP-Referer': 'https://visionavaxforex.onspace.app',
+            'HTTP-Referer': 'https://onspace.app',
             'X-Title': 'VISION AVAX FOREX',
           },
           body: JSON.stringify({
