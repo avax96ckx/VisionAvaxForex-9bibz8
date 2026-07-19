@@ -92,7 +92,7 @@ RULES:
 
     if (openRouterKey) {
       try {
-        const orRes = await fetch('https://openrouter.ai', {
+        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
